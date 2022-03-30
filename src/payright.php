@@ -214,15 +214,20 @@ class Payright extends WC_Payment_Gateway
             $json_payload = file_get_contents('php://input');
             $payright_payload = json_decode($json_payload, true);
             $is_callback = isset($payright_payload['id']);
-            $signature = $_SERVER['HTTP_SIGNATURE'] ?? false;
+            $signature = isset($_SERVER['HTTP_SIGNATURE']) ? $this->clean($_SERVER['HTTP_SIGNATURE']) : false;
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-            if (isset($_REQUEST['payright'])) {
-                $payright_payload = $_REQUEST['payright'];
+            if (isset($_REQUEST['payright'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                $payright_payload = $_REQUEST['payright']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 $is_callback = false;
-                $signature = $payright_payload['signature'] ?? false;
+                $signature = isset($payright_payload['signature']) ? $this->clean($payright_payload['signature']) : false;
             }
+        }
+
+        if (is_array($payright_payload)) {
+            $payright_payload_raw = $payright_payload; // store this as a raw data to use for checksum, if the data got sanitize, the checksum hash will be difference 
+            $payright_payload = $this->sanitize_params($payright_payload);
         }
 
         if (isset($payright_payload['id']) && isset($payright_payload['order_no']) && $signature) {
@@ -241,7 +246,7 @@ class Payright extends WC_Payment_Gateway
                     case 'paid':
                         if (in_array($order_status, ['cancelled', 'pending', 'processing'])) {
                             if ($order_status == 'cancelled' || $order_status == 'pending') {
-                                $calculate_checksum = $this->calculate_checksum($payright_payload, $this->signature_key, $call_type);
+                                $calculate_checksum = $this->calculate_checksum($payright_payload_raw, $this->signature_key, $call_type);
                                 if ((string) $calculate_checksum !== (string) $signature)
                                 {
                                     $order->add_order_note('Mismatch signature data<br>
@@ -277,7 +282,7 @@ class Payright extends WC_Payment_Gateway
                     case 'due':
                         if (in_array($order_status, ['cancelled', 'pending', 'processing'])) {
                             if ($order_status == 'cancelled' || $order_status == 'pending') {
-                                $calculate_checksum = $this->calculate_checksum($payright_payload, $this->signature_key, $call_type);
+                                $calculate_checksum = $this->calculate_checksum($payright_payload_raw, $this->signature_key, $call_type);
                                 if ((string) $calculate_checksum !== (string) $signature)
                                 {
                                     $order->add_order_note('Mismatch signature data<br>
@@ -304,7 +309,7 @@ class Payright extends WC_Payment_Gateway
                                 echo 'OK';
                             } else {
                                 wp_redirect(wc_get_checkout_url());
-                                wc_add_notice('Payment was declined<br>Reason: Bank error or insufficient fund', 'error');
+                                wc_add_notice('Payright payment failed', 'error');
                             }
                             exit();
                         }
@@ -312,6 +317,35 @@ class Payright extends WC_Payment_Gateway
                 }
             }
         }
+    }
+
+    private function sanitize_params($data = [])
+    {
+        $params = [
+             'id',
+             'collection',
+             'paid',
+             'state',
+             'amount',
+             'paid_amount',
+             'due_at',
+             'biller_name',
+             'biller_email',
+             'biller_mobile',
+             'url',
+             'paid_at',
+             'order_no',
+             'status',
+             'signature',
+             'wc-api',
+         ];
+
+        foreach ($params as $k) {
+            if (isset($data[$k])) {
+                $data[$k] = sanitize_text_field($data[$k]);
+            }
+        }
+        return $data;
     }
 
     private function calculate_checksum($data, $signatureKey, $type = 'redirect') {
@@ -349,20 +383,8 @@ class Payright extends WC_Payment_Gateway
         return true;
     }
 
-    /**
-     * Check if we are forcing SSL on checkout pages, Custom function not required by the Gateway for now
-     */
-    public function do_ssl_check()
-    {
-        if ($this->enabled == 'yes') {
-            if (get_option('woocommerce_force_ssl_checkout') == 'no') {
-                echo "<div class=\"error\"><p>".sprintf(__("<strong>%s</strong> is enabled and WooCommerce is not forcing the SSL certificate on your checkout page. Please ensure that you have a valid SSL certificate and that you are <a href=\"%s\">forcing the checkout pages to be secured.</a>"), $this->method_title, admin_url('admin.php?page=wc-settings&tab=checkout'))."</p></div>";
-            }
-        }
-    }
-
+   
     public function requirements_check() {
-        $this->do_ssl_check();
     }
 
     /**
@@ -414,4 +436,12 @@ class Payright extends WC_Payment_Gateway
         return $this->is_sandbox() ? 'https://sandbox.payright.my' : 'https://payright.my';
     }
 
+    private function clean( $var ) {
+        if ( is_array( $var ) ) {
+            return array_map( 'self::clean', $var );
+        } else {
+            return is_scalar( $var ) ? sanitize_text_field( $var ) : $var;
+        }
+    }
+    
 }
