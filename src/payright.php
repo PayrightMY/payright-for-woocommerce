@@ -17,7 +17,6 @@ class Payright extends WC_Payment_Gateway
         $this->method_title = __('Payright', 'payright');
         $this->method_description = __('Payright Payment Gateway Plug-in for WooCommerce', 'payright');
         $this->title = __('Payright', 'payright');
-        $this->sandbox = 'no';
         $this->has_fields = true;
         $this->order_button_text  =  __('Pay with Payright', 'payright');
 
@@ -80,13 +79,6 @@ class Payright extends WC_Payment_Gateway
                 'type' => 'title',
                 'description' => __('All of these details can be obtained from Payright Account Setttings.', 'payright'),
             ),
-            'sandbox' => array(
-                'title' => __('Payright sandbox', 'payright'),
-                'type' => 'checkbox',
-                'label' => __('Enable Payright sandbox', 'payright'),
-                'default' => 'no',
-                'description' => sprintf(__('Payright sandbox can be used to test payments. Sign up for a <a href="%s" target="_blank">sandbox account</a>.', 'payright'), 'https://sandbox.payright.my'),
-            ),
             'apikey' => array(
                 'title' => __('API Key', 'payright'),
                 'type' => 'text',
@@ -117,7 +109,7 @@ class Payright extends WC_Payment_Gateway
         $customer_order = wc_get_order($order_id);
 
         # Prepare the data to send to payright gateway
-        $detail = 'Payment for order '.$order_id;
+        $detail = 'Payment for Order #'.$order_id;
 
         $callback_url = add_query_arg(array('wc-api' => 'payright', 'order' => $order_id), home_url('/'));
         $return_url = wc_get_endpoint_url('order-received', '', wc_get_checkout_url());
@@ -214,7 +206,7 @@ class Payright extends WC_Payment_Gateway
             $json_payload = file_get_contents('php://input');
             $payright_payload = json_decode($json_payload, true);
             $is_callback = isset($payright_payload['id']);
-            $signature = isset($_SERVER['HTTP_SIGNATURE']) ? $this->clean($_SERVER['HTTP_SIGNATURE']) : false;
+            $signature = isset($payright_payload['signature']) ? $this->clean($payright_payload['signature']) : false;
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'GET') {
@@ -225,7 +217,7 @@ class Payright extends WC_Payment_Gateway
             }
         }
 
-        if (is_array($payright_payload)) {
+        if (isset($payright_payload) && is_array($payright_payload)) {
             $payright_payload_raw = $payright_payload; // store this as a raw data to use for checksum, if the data got sanitize, the checksum hash will be difference 
             $payright_payload = $this->sanitize_params($payright_payload);
         }
@@ -355,7 +347,7 @@ class Payright extends WC_Payment_Gateway
                 $data_sorted['payright']['order_no'] = $data['order_no'];
                 $data_sorted['payright']['paid_at'] = $data['paid_at'];
                 $data_sorted['payright']['status'] = $data['status'];
-                return hash_hmac('sha256', json_encode($data_sorted), $signatureKey);
+                return hash_hmac('sha256', json_encode($data_sorted, JSON_UNESCAPED_SLASHES), $signatureKey);
             case 'callback':
                 $data_sorted['amount'] = $data['amount'];
                 $data_sorted['biller_email'] = $data['biller_email'];
@@ -370,7 +362,7 @@ class Payright extends WC_Payment_Gateway
                 $data_sorted['paid_at'] = $data['paid_at'];
                 $data_sorted['state'] = $data['state'];
                 $data_sorted['url'] = $data['url'];
-                return hash_hmac('sha256', json_encode($data_sorted), $signatureKey);
+                return hash_hmac('sha256', json_encode($data_sorted, JSON_UNESCAPED_SLASHES), $signatureKey);
         }
     }
 
@@ -408,23 +400,13 @@ class Payright extends WC_Payment_Gateway
     }
 
     /**
-     * get does is sandbox
-     * @return mixed
-     * @return bool
-     */
-    public function is_sandbox()
-    {
-        return $this->sandbox == 'no' ? false : true;
-    }
-
-    /**
      * get endpoint
      * @return mixed
      * @return string
      */
     public function get_endpoint()
     {
-        return $this->is_sandbox() ? 'https://sandbox.payright.my/api/v1' : 'https://payright.my/api/v1';
+        return 'https://payright.my/api/v1';
     }
 
     /**
@@ -433,7 +415,7 @@ class Payright extends WC_Payment_Gateway
      */
     public function base_url()
     {
-        return $this->is_sandbox() ? 'https://sandbox.payright.my' : 'https://payright.my';
+        return 'https://payright.my';
     }
 
     private function clean( $var ) {

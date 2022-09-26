@@ -2,9 +2,9 @@
 Contributors: Payright
 Tags: payment gateway, payment platform, Malaysia, online banking, fpx
 Requires at least: 5.4
-Tested up to: 5.9
+Tested up to: 6.0.2
 Requires PHP: 5.6.20
-Stable tag: 1.0.0
+Stable tag: 1.0.2
 License: GPL-2.0+
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,3 +84,11 @@ Contact us on our email at dev@payright.my if you have any questions or comments
 
 = 1.0.0 =
 * Initial release
+
+= 1.0.1 =
+* Remove sandbox
+* Fixed bugs
+* Add json_encode with JSON_UNESCAPED_SLASHES
+
+= 1.0.2 =
+* Fixed bugs

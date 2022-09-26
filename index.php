@@ -3,10 +3,10 @@
  * Plugin Name: Payright for WooCommerce
  * Plugin URI: https://wordpress.org/plugins/payright-for-woocommerce/#installation
  * Description: Integrate your WooCommerce site with Payright Payment Gateway.
- * Version: 1.0.0
+ * Version: 1.0.2
  * Author: Payright Sdn Bhd
  * Author URI: https://payright.my
- * WC tested up to: 5.5.2
+ * WC tested up to: 6.0.2
  *
  */
 
